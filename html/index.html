@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS TextDecoder Benchmark</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #output {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            min-height: 200px;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #005aa3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007acc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>JS TextDecoder Benchmark</h1>
+    <p>This benchmark tests the performance of JavaScript's TextDecoder API when decoding different types of Unicode text in your browser.</p>
+    <p>Specifically, we benchmark the following function: <code>new TextDecoder('utf-8').decode(bytes)</code>.</p>
+
+    <button id="runBtn">Run Benchmark</button>
+
+    <div id="output"></div>
+
+    <script type="module">
+        import { Bench } from 'https://cdn.jsdelivr.net/npm/tinybench@6.0.0/+esm';
+
+        const output = document.getElementById('output');
+        const runBtn = document.getElementById('runBtn');
+
+        function log(message) {
+            output.textContent += message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function runBenchmark() {
+            runBtn.disabled = true;
+            runBtn.innerHTML = 'Running Benchmark...<div class="loading"></div>';
+            output.textContent = '';
+
+            try {
+                log('Loading test data...');
+
+                const encoder = new TextEncoder('utf-8');
+                const decoder = new TextDecoder('utf-8');
+
+                const urls = {
+                    latin: "https://raw.githubusercontent.com/lemire/unicode_lipsum/main/lipsum/Latin-Lipsum.utf8.txt",
+                    arabic: "https://raw.githubusercontent.com/lemire/unicode_lipsum/main/lipsum/Arabic-Lipsum.utf8.txt",
+                    chinese: "https://raw.githubusercontent.com/lemire/unicode_lipsum/main/lipsum/Chinese-Lipsum.utf8.txt"
+                };
+
+                // Fetch the three texts individually
+                const [latinRes, arabicRes, chineseRes] = await Promise.all([
+                    fetch(urls.latin),
+                    fetch(urls.arabic),
+                    fetch(urls.chinese)
+                ]);
+
+                const latinText = await latinRes.text();
+                const arabicText = await arabicRes.text();
+                const chineseText = await chineseRes.text();
+
+                const latinBytes = encoder.encode(latinText);
+                const arabicBytes = encoder.encode(arabicText);
+                const chineseBytes = encoder.encode(chineseText);
+
+                log('Data sizes:');
+                log(`Latin:   ${(latinBytes.byteLength / 1024).toFixed(3)} KiB`);
+                log(`Arabic:  ${(arabicBytes.byteLength / 1024).toFixed(3)} KiB`);
+                log(`Chinese: ${(chineseBytes.byteLength / 1024).toFixed(3)} KiB\n`);
+
+                const bench = new Bench({
+                    warmupIterations: 10,
+                    iterations: 50
+                });
+
+                bench
+                    .add('Latin lipsum (ASCII)', () => {
+                        try {
+                            // create a fresh decoder to avoid any internal state in some browsers
+                            return new TextDecoder('utf-8').decode(latinBytes);
+                        } catch (e) {
+                            // return a harmless value instead of throwing so tinybench doesn't mark the task as errored
+                            return null;
+                        }
+                    })
+                    .add('Arabic lipsum', () => {
+                        try {
+                            return new TextDecoder('utf-8').decode(arabicBytes);
+                        } catch (e) {
+                            return null;
+                        }
+                    })
+                    .add('Chinese lipsum', () => {
+                        try {
+                            return new TextDecoder('utf-8').decode(chineseBytes);
+                        } catch (e) {
+                            return null;
+                        }
+                    });
+
+                log('Running benchmark...');
+                await bench.run();
+
+                log('Benchmark results (higher GiB/s is better):');
+                log('| Test | Size | Throughput | Mean Time |');
+                log('|------|------|------------|-----------|');
+
+                const tasks = bench.tasks;
+                const sizes = [latinBytes.byteLength, arabicBytes.byteLength, chineseBytes.byteLength];
+
+                tasks.forEach((task, i) => {
+                    const result = task.result;
+                    if (result.state !== 'completed') {
+                        log(`Task ${task.name} failed with state: ${result.state}`);
+                        if (result.error) log(`Error: ${result.error.message}`);
+                        return;
+                    }
+                    const sizeGB = sizes[i] / (1024 ** 3);
+                    const opsPerSec = result.throughput.mean;
+                    const throughput = (sizeGB * opsPerSec).toFixed(2);
+                    const sizeKiB = (sizes[i] / 1024).toFixed(3);
+                    log(`| ${task.name} | ${sizeKiB} KiB | ${throughput} GiB/s | ${result.latency.mean.toFixed(3)} ms |`);
+                });
+
+                log('\nBenchmark completed!');
+
+            } catch (error) {
+                log('Error: ' + error.message);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerHTML = 'Run Benchmark';
+            }
+        }
+
+        runBtn.addEventListener('click', runBenchmark);
+    </script>
+</body>
+</html>

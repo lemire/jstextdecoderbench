@@ -2,15 +2,21 @@
 
 This project benchmarks the performance of JavaScript's `TextDecoder` API when decoding different types of Unicode text.
 
+Specifically, we benchmark the following function `new TextDecoder('utf-8').decode(bytes)`.
+
 ## Installation
 
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/jstextdecoderbench.git
+git clone https://github.com/lemire/jstextdecoderbench.git
 cd jstextdecoderbench
 npm install
 ```
+
+## Browser Version
+
+You can also run the benchmark directly in your browser: view the [live demo](https://lemire.github.io/jstextdecoderbench/).
 
 ## Usage
 
