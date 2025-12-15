@@ -1,6 +1,0 @@
-{
-  "type": "module",
-  "dependencies": {
-    "tinybench": "^6.0.0"
-  }
-}
