@@ -1,8 +1,6 @@
 # JS TextDecoder Benchmark
 
-This project benchmarks the performance of JavaScript's `TextDecoder` API when decoding different types of Unicode text.
-
-Specifically, we benchmark the following function `new TextDecoder('utf-8').decode(bytes)`.
+This project benchmarks the performance of JavaScript's `TextDecoder` API when decoding different types of Unicode text. Specifically, we benchmark the following function `new TextDecoder('utf-8').decode(bytes)`. We also provide a browser benchmark.
 
 ## Installation
 
